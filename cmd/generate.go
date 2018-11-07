@@ -56,6 +56,20 @@ table, th, td {
     overflow-x: hidden;
     border: 1px solid black;
 }
+.request-col {
+	max-width: 400px;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+#trends-table-body td:nth-child(n+2) {
+	width: 120px;
+	max-width: 120px;
+	text-align: center;
+}
+#header-row>th:nth-child(n+2) {
+	cursor: pointer;
+}
     </style>
 </head>
 <body>
@@ -93,7 +107,7 @@ function headerPopulate() {
     comparisonList.innerHTML = ""
     headerRow.innerHTML = "<th><span>Test Description</span><hr/><span>Request</span></th>"
     for (let i=0; i<data.tests.length; i++) {
-        headerRow.innerHTML += ` + "`<th class=\"desc-header\">${data.tests[i]}</th>`" + `
+        headerRow.innerHTML += ` + "`<th class=\"desc-header\" onclick=\"sortByColValue(${i})\">${data.tests[i]}</th>`" + `
         comparisonList.innerHTML += ` + "`<li><label for=\"chk${i}\"><input type=\"checkbox\" name=\"chk${i}\" id=\"chk${i}\">${data.tests[i]}</label></li>`" + `
     }
 }
@@ -113,9 +127,9 @@ function rowsPopulate(stat) {
     let r = data.results
     let rowsMedians = {}
     for (let key in r) {
-        let row = ` + "`<tr><td>${key}</td>`" + `
+        let row = ` + "`<tr><td class=\"request-col\" title=\"${key}\">${key}</td>`" + `
         let validValues = r[key][stat].filter((val) => val != 0)
-        validValues.sort((a, b) => a > b)
+        validValues.sort((a, b) => a - b)
         let rowMedian = medianCalculator(validValues)
         r[key][stat].forEach(function(s) {
 			if (s == 0) {
@@ -151,13 +165,15 @@ function compare() {
     let headerRow = document.getElementById("header-row")
     let tBody = document.getElementById("trends-table-body")
     headerRow.innerHTML = "<th><span>Test Description</span><hr/><span>Request</span></th>"
-    tBody.innerHTML = ""
+	tBody.innerHTML = ""
+	let i = 0
     idxs.forEach(function(idx) {
-        headerRow.innerHTML += ` + "`<th class=\"desc-header\">${data.tests[idx]}</th>`" + `
+		headerRow.innerHTML += ` + "`<th class=\"desc-header\" onclick=\"sortByColValue(${i})\">${data.tests[idx]}</th>`" + `
+		i++
     })
     let r = data.results
     for (let key in r) {
-        let row = ` + "`<tr><td>${key}</td>`" + `
+        let row = ` + "`<tr><td class=\"request-col\" title=\"${key}\">${key}</td>`" + `
         let vals = r[key][metric]
         let baselineVal = undefined
         idxs.forEach(function(idx) {
@@ -185,6 +201,34 @@ function compare() {
         tBody.innerHTML += row
     }
 }
+
+function sortByColValue(idx) {
+	let sortClass = document.querySelectorAll("#header-row > th")[idx + 1].classList
+	let allRows = document.querySelectorAll("#trends-table-body > tr")
+	let allRowsArray = Array.from(allRows)
+	let emptyElems = allRowsArray.filter((elem) => elem.childNodes[idx + 1].innerText.trim() == "-")
+	allRowsArray = allRowsArray.filter((elem) => elem.childNodes[idx + 1].innerText.trim().match(/([\d\.]+(\s\(-?\d+%\))?)/))
+	let orderDesc = sortClass.contains("desc")
+	document.querySelectorAll("#header-row > th:nth-child(n+2)").forEach((elem) => elem.classList.remove("desc"))
+	let pattern = /^([\d\.]+)/
+	allRowsArray.sort(function (a, b) {
+		let aText = pattern.exec(a.childNodes[idx + 1].innerText)[1]
+		let bText = pattern.exec(b.childNodes[idx + 1].innerText)[1]
+		let result = 0
+		if (orderDesc) {
+			result = aText - bText
+		} else {
+			result = bText - aText
+			sortClass.add("desc")
+		}
+
+		return result
+	})
+	let tableBody = document.querySelector("#trends-table-body")
+	tableBody.innerHTML = ""
+	allRowsArray.forEach((elem) => tableBody.appendChild(elem))
+	emptyElems.forEach((elem) => tableBody.appendChild(elem))
+}
 </script>
 </html>
 `
@@ -193,14 +237,6 @@ function compare() {
 type Results struct {
 	Tests []string                        `json:"tests"`
 	Stats map[string]map[string][]float64 `json:"results"`
-}
-
-func fillMissingStatValue(index int, stats []string) []string {
-	stats = append(stats, "")
-	copy(stats[index+1:], stats[index:])
-	stats[index] = "0"
-
-	return stats
 }
 
 func convertStatsToFloats(stringStats []string, floatStats []float64) {
@@ -287,10 +323,8 @@ GROUP BY request_statistics.label;
 			for i, v := range tests {
 				if v != splitDesc[i] {
 					// inserting missing values
-					splitDesc = append(splitDesc, "")
 					copy(splitDesc[i+1:], splitDesc[i:])
 					splitDesc[i] = v
-					splitDesc = splitDesc[:testsNumber]
 
 					splitAverage = fillMissingStatValue(i, splitAverage)
 					splitMedian = fillMissingStatValue(i, splitMedian)
@@ -300,6 +334,7 @@ GROUP BY request_statistics.label;
 					splitMax = fillMissingStatValue(i, splitMax)
 				}
 			}
+			splitDesc = splitDesc[:testsNumber]
 		}
 
 		requestStats := make(map[string][]float64)

@@ -25,8 +25,7 @@ func Initialize(dbDriver *sql.DB) error {
 		return err
 	}
 	statement.Exec()
-	statement, _ = dbDriver.Prepare(requestStatisticsTable)
-	statement.Exec()
+	dbDriver.Exec(requestStatisticsTable)
 
 	return nil
 }

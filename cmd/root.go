@@ -29,17 +29,31 @@ var (
 	delimiter           string
 	header              bool
 	ignorePatternString string
+	exportFileName      string
+	metric              string
 	// DB is a packagewide variable that containds database handler
 	DB *sql.DB
 )
+
+func fillMissingStatValue(index int, stats []string, customVal ...string) []string {
+	stats = append(stats, "")
+	copy(stats[index+1:], stats[index:])
+	if len(customVal) > 0 {
+		stats[index] = customVal[0]
+	} else {
+		stats[index] = "0"
+	}
+
+	return stats
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "perf-trends",
 	Short: "Parses jmeter log and build performance trends statistics",
 	Long: `An application that parses Jmeter log and gathers
-by-transaction statistics saving it to CSV-file for further
-parsing and analysis by other applications`,
+by-transaction statistics saving it to SQLite database for further.
+Data can be exported as CSV file, or dynamic HTML page.`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
