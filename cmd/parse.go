@@ -49,6 +49,9 @@ type RequestStats struct {
 	Max     int
 }
 
+// parseRecord function takes a split line from log, finds label and time elapsed
+// then matches label to a provided pattern via "ignore-pattern" flag.
+// If label is not matched then parse duration as int and put data into records map
 func parseRecord(record []string) {
 	label, elapsed := record[2], record[1]
 	if ignorePattern.MatchString(label) {
@@ -58,6 +61,7 @@ func parseRecord(record []string) {
 	records[label] = append(records[label], parsedElapsed)
 }
 
+// calculatePercentile function calculates perentile for values slice provided
 func calculatePercentile(stats []int, perc int) float64 {
 	rank := float64(perc)/100.0*float64(len(stats)-1) + 1
 	ir := int(rank)
@@ -68,6 +72,7 @@ func calculatePercentile(stats []int, perc int) float64 {
 	return math.Round(percentile*100) / 100
 }
 
+// calculateStats function calculates all metrics and stores them in the struct
 func calculateStats(stats []int, rs *RequestStats) {
 	length := len(stats)
 	sort.Ints(stats)
@@ -86,7 +91,6 @@ func calculateStats(stats []int, rs *RequestStats) {
 	}
 
 	avg = math.Round(float64(sum)/float64(length)*100) / 100
-
 	median = calculatePercentile(stats, 50)
 	perc90 = calculatePercentile(stats, 90)
 	perc95 = calculatePercentile(stats, 95)
@@ -99,9 +103,10 @@ func calculateStats(stats []int, rs *RequestStats) {
 	rs.Perc95 = perc95
 }
 
+// parseFiles function parses input file storing results into db file
 func parseFiles(cmd *cobra.Command, args []string) {
 	ignorePattern = regexp.MustCompile(ignorePatternString)
-	inputPath, outputPath, description := args[0], args[1], args[2]
+	description, outputPath, inputPaths := args[0], args[1], args[2:]
 	// removing all commas as those are used for concatenation later
 	description = strings.Replace(description, ",", "", -1)
 	var err error
@@ -117,41 +122,45 @@ func parseFiles(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	inputFile, err := os.Open(inputPath)
-	defer inputFile.Close()
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	reader := csv.NewReader(inputFile)
-	if delimiter != "," {
-		reader.Comma = rune(delimiter[0])
-	}
-
-	// skipping first line of log as header
-	if header {
-		reader.Read()
-	}
-
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
+	for _, inputPath := range inputPaths {
+		inputFile, err := os.Open(inputPath)
+		defer inputFile.Close()
 		if err != nil {
 			fmt.Println(err.Error())
 			os.Exit(1)
 		}
-		parseRecord(record)
+
+		reader := csv.NewReader(inputFile)
+		if delimiter != "," {
+			reader.Comma = rune(delimiter[0])
+		}
+
+		// skipping first line of log as header
+		if header {
+			reader.Read()
+		}
+
+		for {
+			record, err := reader.Read()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				fmt.Println(err.Error())
+				os.Exit(1)
+			}
+			parseRecord(record)
+		}
 	}
 
+	// inserting new test into db getting row id in return
 	res, err := DB.Exec(`
 INSERT INTO tests
 	(description)
 	VALUES (?);
 `, description)
 	if err != nil {
+		// stop process if description is not unique
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
 			fmt.Println("Provided test description is not unique")
 		} else {
@@ -161,6 +170,7 @@ INSERT INTO tests
 	}
 	lastID, _ := res.LastInsertId()
 
+	// preparing an insert statement
 	insertStatement, _ := DB.Prepare(`
 INSERT INTO request_statistics
 	(test_id, label, samples, average, median, perc90, perc95, min, max)
@@ -171,6 +181,7 @@ INSERT INTO request_statistics
 		rs.Label = req
 		rs.Samples = len(stats)
 		calculateStats(stats, &rs)
+		// insert data in db row by row
 		_, err := insertStatement.Exec(lastID, rs.Label, rs.Samples, rs.Average,
 			rs.Median, rs.Perc90, rs.Perc95, rs.Min, rs.Max)
 		if err != nil {
@@ -180,20 +191,23 @@ INSERT INTO request_statistics
 	}
 }
 
+// validateParseArgs function validates arguments for "parse" command
 func validateParseArgs(cmd *cobra.Command, args []string) error {
 	// validate argumets amount
-	if len(args) != 3 {
+	if len(args) < 3 {
 		return errors.New("Please provide two path arguments and a unique description")
 	}
 
-	// validate if input file exists and is not a dir
-	if fileInf, err := os.Stat(args[0]); err != nil || fileInf.IsDir() {
-		return errors.New("Input file path is invalid or file does not exist")
-	}
-
-	// validate if output file is not a dir
+	// validate if db file is not a dir
 	if fileInf, err := os.Stat(args[1]); err == nil && fileInf.IsDir() {
 		return errors.New("Output file path is invalid")
+	}
+
+	// validate if input files exist and are not a dir
+	for _, val := range args[2:] {
+		if fileInf, err := os.Stat(val); err != nil || fileInf.IsDir() {
+			return errors.New("Input file path is invalid or file does not exist")
+		}
 	}
 
 	// validate length of delimiter
@@ -211,7 +225,7 @@ func validateParseArgs(cmd *cobra.Command, args []string) error {
 
 // parseCmd represents the parse command
 var parseCmd = &cobra.Command{
-	Use:   `parse path/to/input/file path/to/output/file "unique description"`,
+	Use:   `parse "unique test description" path/to/db/file path/to/input/file [other/input/files...]`,
 	Short: "Parses jmeter log file into new CSV",
 	Long: `Parses jmeter log file from a provided path and appends
 to the results CSV file at the provided output path`,

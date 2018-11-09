@@ -22,11 +22,14 @@ import (
 	"os"
 	"strings"
 
+	_ "github.com/mattn/go-sqlite3" // driver for sqlite3 database
 	"github.com/spf13/cobra"
 )
 
+// metrics variable contains valid values for "metric" flag
 var metrics = []string{"average", "median", "perc90", "perc95", "min", "max"}
 
+// exportData function takes data from database and exports it to CSV file
 func exportData(cmd *cobra.Command, args []string) {
 	inputPath := args[0]
 	var err error
@@ -37,22 +40,11 @@ func exportData(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	rows, err := DB.Query(`SELECT description FROM tests ORDER BY test_id ASC;`)
-	defer rows.Close()
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	var tests []string
-	for rows.Next() {
-		var tst string
-		rows.Scan(&tst)
-		tests = append(tests, tst)
-	}
+	tests := getTestsFromDB(DB)
 	testsNumber := len(tests)
 
-	rows, err = DB.Query(fmt.Sprintf(`
+	// depending on "metric" flag value returns a corresponding statistics data
+	rows, err := DB.Query(fmt.Sprintf(`
 SELECT request_statistics.label,
 	GROUP_CONCAT(tests.description),
 	GROUP_CONCAT(request_statistics.%s)
@@ -66,6 +58,7 @@ GROUP BY request_statistics.label;
 		os.Exit(1)
 	}
 
+	// create/overwrite an existing file
 	file, err := os.Create(exportFileName)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -73,6 +66,7 @@ GROUP BY request_statistics.label;
 	}
 
 	fileHandler := csv.NewWriter(file)
+	// buffer header to a fileWriter
 	fileHandler.Write(append([]string{"Request\\Test"}, tests...))
 	for rows.Next() {
 		var (
@@ -81,9 +75,11 @@ GROUP BY request_statistics.label;
 			stats        string
 		)
 		rows.Scan(&label, &descriptions, &stats)
+		// splitting all concatenated data into arrays
 		splitDesc := strings.Split(descriptions, ",")
 		splitStats := strings.Split(stats, ",")
-
+		// If there is no info for particular transaction in some test
+		// then fill all values with zeroes
 		if len(splitDesc) != testsNumber {
 			diff := testsNumber - len(splitDesc)
 			splitDesc = append(splitDesc, make([]string, diff)...)
@@ -92,17 +88,18 @@ GROUP BY request_statistics.label;
 					// inserting missing values
 					copy(splitDesc[i+1:], splitDesc[i:])
 					splitDesc[i] = v
-
+					// insert zero value at current index to each array
 					splitStats = fillMissingStatValue(i, splitStats, "")
 				}
 			}
-			splitDesc = splitDesc[:testsNumber]
 		}
+		// buffer stats line into fileWriter
 		fileHandler.Write(append([]string{label}, splitStats...))
 	}
-	fileHandler.Flush()
+	fileHandler.Flush() // write biffered data to a file
 }
 
+// validateExportArgs function validates arguments for "export" command
 func validateExportArgs(cmd *cobra.Command, args []string) error {
 	// validate argumets amount
 	if len(args) != 1 {

@@ -29,7 +29,8 @@ import (
 	"github.com/valyala/fasttemplate"
 )
 
-const htmlPage = `<!DOCTYPE html>
+// HTML_PAGE represents a template for a generated page
+const HTML_PAGE = `<!DOCTYPE html>
 <!DOCTYPE html>
 <html>
 <head>
@@ -308,6 +309,7 @@ GROUP BY request_statistics.label;
 			max            string
 		)
 		rows.Scan(&label, &testDecription, &average, &median, &perc90, &perc95, &min, &max)
+		// splitting all concatenated data into arrays
 		splitDesc := strings.Split(testDecription, ",")
 		splitAverage := strings.Split(average, ",")
 		splitMedian := strings.Split(median, ",")
@@ -315,8 +317,8 @@ GROUP BY request_statistics.label;
 		splitPerc95 := strings.Split(perc95, ",")
 		splitMin := strings.Split(min, ",")
 		splitMax := strings.Split(max, ",")
-		// I need to think how to otimize this piece of crap code
-		// It works though
+		// If there is no info for particular transaction in some test
+		// then fill all values with zeroes
 		if len(splitDesc) != testsNumber {
 			diff := testsNumber - len(splitDesc)
 			splitDesc = append(splitDesc, make([]string, diff)...)
@@ -325,7 +327,7 @@ GROUP BY request_statistics.label;
 					// inserting missing values
 					copy(splitDesc[i+1:], splitDesc[i:])
 					splitDesc[i] = v
-
+					// insert zero value at current index to each array
 					splitAverage = fillMissingStatValue(i, splitAverage)
 					splitMedian = fillMissingStatValue(i, splitMedian)
 					splitPerc90 = fillMissingStatValue(i, splitPerc90)
@@ -334,9 +336,9 @@ GROUP BY request_statistics.label;
 					splitMax = fillMissingStatValue(i, splitMax)
 				}
 			}
-			splitDesc = splitDesc[:testsNumber]
 		}
 
+		// create a map and arrays for each metric
 		requestStats := make(map[string][]float64)
 		requestStats["average"] = make([]float64, testsNumber, testsNumber)
 		requestStats["median"] = make([]float64, testsNumber, testsNumber)
@@ -345,6 +347,7 @@ GROUP BY request_statistics.label;
 		requestStats["min"] = make([]float64, testsNumber, testsNumber)
 		requestStats["max"] = make([]float64, testsNumber, testsNumber)
 
+		// parse each value in array as float and put into an array
 		convertStatsToFloats(splitAverage, requestStats["average"])
 		convertStatsToFloats(splitMedian, requestStats["median"])
 		convertStatsToFloats(splitPerc90, requestStats["perc90"])
@@ -357,13 +360,15 @@ GROUP BY request_statistics.label;
 
 	results.Tests = tests
 
+	// marshall Results struct into JSON
 	byteJSON, err := json.Marshal(results)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	t := fasttemplate.New(htmlPage, "{{", "}}")
+	// take a template string, fill in data and write it as a file
+	t := fasttemplate.New(HTML_PAGE, "{{", "}}")
 	page := t.ExecuteString(map[string]interface{}{
 		"data": string(byteJSON),
 	})
@@ -375,6 +380,7 @@ GROUP BY request_statistics.label;
 	file.WriteString(page)
 }
 
+// validateGenerateArgs function validates arguments for "generate" command
 func validateGenerateArgs(cmd *cobra.Command, args []string) error {
 	// validate argumets amount
 	if len(args) != 1 {

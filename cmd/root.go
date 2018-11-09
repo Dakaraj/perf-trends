@@ -23,7 +23,7 @@ import (
 )
 
 // VERSION represents a current version of application
-const VERSION = "0.0.1"
+const VERSION = "0.1.1"
 
 var (
 	delimiter           string
@@ -35,6 +35,8 @@ var (
 	DB *sql.DB
 )
 
+// fillMissingStatValue function inserts a value into array
+// at a given index returns modified array
 func fillMissingStatValue(index int, stats []string, customVal ...string) []string {
 	stats = append(stats, "")
 	copy(stats[index+1:], stats[index:])
@@ -45,6 +47,24 @@ func fillMissingStatValue(index int, stats []string, customVal ...string) []stri
 	}
 
 	return stats
+}
+
+// getTestsFromDB retrieves tests descriptions from DB for further use
+func getTestsFromDB(DB *sql.DB) (tests []string) {
+	rows, err := DB.Query(`SELECT description FROM tests ORDER BY test_id ASC;`)
+	defer rows.Close()
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+
+	for rows.Next() {
+		var tst string
+		rows.Scan(&tst)
+		tests = append(tests, tst)
+	}
+
+	return tests
 }
 
 // rootCmd represents the base command when called without any subcommands
