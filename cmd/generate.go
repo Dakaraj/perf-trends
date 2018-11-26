@@ -29,8 +29,8 @@ import (
 	"github.com/valyala/fasttemplate"
 )
 
-// HTML_PAGE represents a template for a generated page
-const HTML_PAGE = `<!DOCTYPE html>
+// TEMPLATE represents a template for a generated page
+const TEMPLATE = `<!DOCTYPE html>
 <!DOCTYPE html>
 <html>
 <head>
@@ -114,6 +114,9 @@ function headerPopulate() {
 }
 
 function medianCalculator(stats) {
+	if (stats.length == 1) {
+		return stats[0]
+	}
     let rank = 0.5 * (stats.length - 1) + 1
     let ir = Math.floor(rank)
     let fr = rank - ir
@@ -368,7 +371,7 @@ GROUP BY request_statistics.label;
 	}
 
 	// take a template string, fill in data and write it as a file
-	t := fasttemplate.New(HTML_PAGE, "{{", "}}")
+	t := fasttemplate.New(TEMPLATE, "{{", "}}")
 	page := t.ExecuteString(map[string]interface{}{
 		"data": string(byteJSON),
 	})

@@ -23,7 +23,7 @@ import (
 )
 
 // VERSION represents a current version of application
-const VERSION = "0.1.1"
+const VERSION = "0.1.2"
 
 var (
 	delimiter           string

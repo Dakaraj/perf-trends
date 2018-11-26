@@ -54,7 +54,7 @@ type RequestStats struct {
 // If label is not matched then parse duration as int and put data into records map
 func parseRecord(record []string) {
 	label, elapsed := record[2], record[1]
-	if ignorePattern.MatchString(label) {
+	if ignorePatternString != "" && ignorePattern.MatchString(label) {
 		return
 	}
 	parsedElapsed, _ := strconv.Atoi(elapsed)
@@ -63,6 +63,9 @@ func parseRecord(record []string) {
 
 // calculatePercentile function calculates perentile for values slice provided
 func calculatePercentile(stats []int, perc int) float64 {
+	if len(stats) == 1 {
+		return float64(stats[0])
+	}
 	rank := float64(perc)/100.0*float64(len(stats)-1) + 1
 	ir := int(rank)
 	fr := rank - float64(ir)
