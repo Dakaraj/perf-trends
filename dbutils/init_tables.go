@@ -26,6 +26,9 @@ func Initialize(dbDriver *sql.DB) error {
 	}
 	statement.Exec()
 	dbDriver.Exec(requestStatisticsTable)
+	dbDriver.Exec(testType)
+	dbDriver.Exec(`INSERT INTO test_types (type_description) VALUES ('load test')`)
+	dbDriver.Exec(`INSERT INTO test_types (type_description) VALUES ('web page test')`)
 
 	return nil
 }

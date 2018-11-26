@@ -50,6 +50,7 @@ SELECT request_statistics.label,
 	GROUP_CONCAT(request_statistics.%s)
 FROM request_statistics
 	JOIN tests ON request_statistics.test_id = tests.test_id
+WHERE tests.type_id = 1
 GROUP BY request_statistics.label;
 `, metric))
 	defer rows.Close()

@@ -14,10 +14,18 @@
 
 package dbutils
 
+const testType = `
+CREATE TABLE IF NOT EXISTS test_types (
+	type_id INTEGER PRIMARY KEY AUTOINCREMENT,
+	type_description VARCHAR(64)
+);`
+
 const testsTable = `
 CREATE TABLE IF NOT EXISTS tests (
 	test_id INTEGER PRIMARY KEY AUTOINCREMENT,
-	description VARCHAR(255) UNIQUE NOT NULL
+	description VARCHAR(255) UNIQUE NOT NULL,
+	type_id INT NOT NULL,
+	FOREIGN KEY (type_id) REFERENCES test_types(type_id) ON DELETE CASCADE
 );`
 
 const requestStatisticsTable = `
