@@ -107,9 +107,11 @@ func parseWPTFiles(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
+	// decoding an input JSON file into map
 	var decodedJSON map[string]interface{}
 	decoder := json.NewDecoder(inputFile)
 	decoder.Decode(&decodedJSON)
+	// leaving only "data" part of the JSON in place
 	decodedJSON = decodedJSON["data"].(map[string]interface{})
 
 	wptID := decodedJSON["id"].(string)
@@ -137,7 +139,7 @@ func parseWPTFiles(cmd *cobra.Command, args []string) {
 INSERT INTO tests (
 	description, type_id
 ) VALUES (
-	?, 1
+	?, 2
 );`, description)
 	if err != nil {
 		// stop process if description is not unique
@@ -163,6 +165,7 @@ INSERT INTO wpt_statistics (
 	?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 	?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 );`)
+
 	// inserting Average stat metrics
 	insertWPTMetrics(insertStatement, lastID, "avg", avgS.Responses200,
 		avgS.BytesOut, avgS.GzipSavings, avgS.RequestsFull, avgS.Connections,
@@ -172,6 +175,7 @@ INSERT INTO wpt_statistics (
 		avgS.OptimizationChecked, avgS.ImageTotal, avgS.ScoreMinify,
 		avgS.GzipTotal, avgS.Responses404, avgS.LoadTime, avgS.ScoreCombine,
 		avgS.FirstContentfulPaint, avgS.FirstLayout, avgS.ScoreEtags)
+
 	// inserting Standard Deviation stat metrics
 	insertWPTMetrics(insertStatement, lastID, "std", stdS.Responses200,
 		stdS.BytesOut, stdS.GzipSavings, stdS.RequestsFull, stdS.Connections,
@@ -181,6 +185,7 @@ INSERT INTO wpt_statistics (
 		stdS.OptimizationChecked, stdS.ImageTotal, stdS.ScoreMinify,
 		stdS.GzipTotal, stdS.Responses404, stdS.LoadTime, stdS.ScoreCombine,
 		stdS.FirstContentfulPaint, stdS.FirstLayout, stdS.ScoreEtags)
+
 	// inserting Median stat metrics
 	insertWPTMetrics(insertStatement, lastID, "med", medS.Responses200,
 		medS.BytesOut, medS.GzipSavings, medS.RequestsFull, medS.Connections,
