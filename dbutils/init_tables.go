@@ -20,13 +20,14 @@ import (
 
 // Initialize function creates tables in DB based on schemas provided in schemas.go
 func Initialize(dbDriver *sql.DB) error {
-	statement, err := dbDriver.Prepare(testsTable)
+	statement, err := dbDriver.Prepare(testType)
 	if err != nil {
 		return err
 	}
 	statement.Exec()
+	dbDriver.Exec(testsTable)
 	dbDriver.Exec(requestStatisticsTable)
-	dbDriver.Exec(testType)
+	dbDriver.Exec(wptStatistics)
 	dbDriver.Exec(`INSERT INTO test_types (type_description) VALUES ('load test')`)
 	dbDriver.Exec(`INSERT INTO test_types (type_description) VALUES ('web page test')`)
 

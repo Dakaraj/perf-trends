@@ -158,10 +158,11 @@ func parseJmeterFiles(cmd *cobra.Command, args []string) {
 
 	// inserting new test into db getting row id in return
 	res, err := DB.Exec(`
-INSERT INTO tests
-	(description, type_id)
-	VALUES (?, 1);
-`, description)
+INSERT INTO tests (
+	description, type_id
+) VALUES (
+	?, 1
+);`, description)
 	if err != nil {
 		// stop process if description is not unique
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
@@ -175,10 +176,11 @@ INSERT INTO tests
 
 	// preparing an insert statement
 	insertStatement, _ := DB.Prepare(`
-INSERT INTO request_statistics
-	(test_id, label, samples, average, median, perc90, perc95, min, max)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-`)
+INSERT INTO request_statistics (
+	test_id, label, samples, average, median, perc90, perc95, min, max
+) VALUES (
+	?, ?, ?, ?, ?, ?, ?, ?, ?
+);`)
 	for req, stats := range records {
 		rs := RequestStats{}
 		rs.Label = req

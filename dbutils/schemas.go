@@ -42,3 +42,37 @@ CREATE TABLE IF NOT EXISTS request_statistics (
 	max INT NOT NULL,
 	FOREIGN KEY (test_id) REFERENCES tests(test_id) ON DELETE CASCADE
 );`
+
+const wptStatistics = `
+CREATE TABLE IF NOT EXISTS wpt_statistics (
+	wpt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+	test_id INT NOT NULL,
+	metric VARCHAR(3) CHECK (metric IN ('avg', 'std', 'med')) NOT NULL,
+	responses_200 FLOAT NOT NULL,
+	bytes_out FLOAT NOT NULL,
+	gzip_savings FLOAT NOT NULL,
+	requests_full FLOAT NOT NULL,
+	connections FLOAT NOT NULL,
+	bytes_out_doc FLOAT NOT NULL,
+	result FLOAT NOT NULL,
+	base_page_ssl_time FLOAT NOT NULL,
+	doc_time FLOAT NOT NULL,
+	dom_content_loaded_event_end FLOAT NOT NULL,
+	image_savings FLOAT NOT NULL,
+	requests_doc FLOAT NOT NULL,
+	first_text_paint FLOAT NOT NULL,
+	first_paint FLOAT NOT NULL,
+	score_cdn FLOAT NOT NULL,
+	cpu_idle FLOAT NOT NULL,
+	optimization_checked FLOAT NOT NULL,
+	image_total FLOAT NOT NULL,
+	score_minify FLOAT NOT NULL,
+	gzip_total FLOAT NOT NULL,
+	responses_404 FLOAT NOT NULL,
+	load_time FLOAT NOT NULL,
+	score_combine FLOAT NOT NULL,
+	first_contentful_paint FLOAT NOT NULL,
+	first_layout FLOAT NOT NULL,
+	score_etags FLOAT NOT NULL,
+	FOREIGN KEY (test_id) REFERENCES tests(test_id) ON DELETE CASCADE
+);`

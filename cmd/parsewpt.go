@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/dakaraj/perf-trends/dbutils"
 	_ "github.com/mattn/go-sqlite3" // driver for sqlite3 database
@@ -27,6 +28,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// WPTResults struct contains all metric data. Tags are used to match
+// map keys to struct fields
 type WPTResults struct {
 	Responses200             float64 `mapstructure:"responses_200"`
 	BytesOut                 float64 `mapstructure:"bytesOut"`
@@ -75,6 +78,13 @@ func validateParseWPTArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// insertWPTMetrics function executes provided statement with values substitution
+func insertWPTMetrics(stmt *sql.Stmt, testID int64, metric string, stats ...interface{}) {
+	stats = append([]interface{}{testID, metric}, stats...)
+	stmt.Exec(stats...)
+}
+
+// parseWPTFiles function parses input file storing results into db file
 func parseWPTFiles(cmd *cobra.Command, args []string) {
 	outputPath, inputPath := args[0], args[1]
 	var err error
@@ -102,25 +112,84 @@ func parseWPTFiles(cmd *cobra.Command, args []string) {
 	decoder.Decode(&decodedJSON)
 	decodedJSON = decodedJSON["data"].(map[string]interface{})
 
-	testID := decodedJSON["id"].(string)
-	testURL := decodedJSON["url"].(string)
-	fmt.Println(testID, testURL)
+	wptID := decodedJSON["id"].(string)
+	wptLocation := decodedJSON["location"].(string)
 
+	// decoding Average stats
 	average := decodedJSON["average"].(map[string]interface{})["firstView"]
-	var averageStruct WPTResults
-	mapstructure.Decode(average, &averageStruct)
+	var avgS WPTResults
+	mapstructure.Decode(average, &avgS)
 
+	// decoding Standard Deviation stats
 	stdDev := decodedJSON["standardDeviation"].(map[string]interface{})["firstView"]
-	var stdDevStruct WPTResults
-	mapstructure.Decode(stdDev, &stdDevStruct)
+	var stdS WPTResults
+	mapstructure.Decode(stdDev, &stdS)
 
+	// decoding Median stats
 	median := decodedJSON["median"].(map[string]interface{})["firstView"]
-	var medianStruct WPTResults
-	mapstructure.Decode(median, &medianStruct)
+	var medS WPTResults
+	mapstructure.Decode(median, &medS)
 
-	fmt.Println(averageStruct)
-	fmt.Println(stdDevStruct)
-	fmt.Println(medianStruct)
+	description := fmt.Sprintf("%s (%s)", wptID, wptLocation)
+
+	// inserting new test into db getting row id in return
+	res, err := DB.Exec(`
+INSERT INTO tests (
+	description, type_id
+) VALUES (
+	?, 1
+);`, description)
+	if err != nil {
+		// stop process if description is not unique
+		if strings.Contains(err.Error(), "UNIQUE constraint") {
+			fmt.Println("Provided test description is not unique")
+		} else {
+			fmt.Println(err.Error())
+		}
+		os.Exit(1)
+	}
+	lastID, _ := res.LastInsertId()
+
+	// preparing an insert statement
+	insertStatement, _ := DB.Prepare(`
+INSERT INTO wpt_statistics (
+	test_id, metric, responses_200, bytes_out, gzip_savings, requests_full,
+	connections, bytes_out_doc, result, base_page_ssl_time, doc_time,
+	dom_content_loaded_event_end, image_savings, requests_doc, first_text_paint,
+	first_paint, score_cdn, cpu_idle, optimization_checked, image_total,
+	score_minify, gzip_total, responses_404, load_time, score_combine,
+	first_contentful_paint, first_layout, score_etags
+) VALUES (
+	?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+	?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+);`)
+	// inserting Average stat metrics
+	insertWPTMetrics(insertStatement, lastID, "avg", avgS.Responses200,
+		avgS.BytesOut, avgS.GzipSavings, avgS.RequestsFull, avgS.Connections,
+		avgS.BytesOutDoc, avgS.Result, avgS.BasePageSSLTime, avgS.DocTime,
+		avgS.DomContentLoadedEventEnd, avgS.ImageSavings, avgS.RequestsDoc,
+		avgS.FirstTextPaint, avgS.FirstPaint, avgS.ScoreCDN, avgS.CPUIdle,
+		avgS.OptimizationChecked, avgS.ImageTotal, avgS.ScoreMinify,
+		avgS.GzipTotal, avgS.Responses404, avgS.LoadTime, avgS.ScoreCombine,
+		avgS.FirstContentfulPaint, avgS.FirstLayout, avgS.ScoreEtags)
+	// inserting Standard Deviation stat metrics
+	insertWPTMetrics(insertStatement, lastID, "std", stdS.Responses200,
+		stdS.BytesOut, stdS.GzipSavings, stdS.RequestsFull, stdS.Connections,
+		stdS.BytesOutDoc, stdS.Result, stdS.BasePageSSLTime, stdS.DocTime,
+		stdS.DomContentLoadedEventEnd, stdS.ImageSavings, stdS.RequestsDoc,
+		stdS.FirstTextPaint, stdS.FirstPaint, stdS.ScoreCDN, stdS.CPUIdle,
+		stdS.OptimizationChecked, stdS.ImageTotal, stdS.ScoreMinify,
+		stdS.GzipTotal, stdS.Responses404, stdS.LoadTime, stdS.ScoreCombine,
+		stdS.FirstContentfulPaint, stdS.FirstLayout, stdS.ScoreEtags)
+	// inserting Median stat metrics
+	insertWPTMetrics(insertStatement, lastID, "med", medS.Responses200,
+		medS.BytesOut, medS.GzipSavings, medS.RequestsFull, medS.Connections,
+		medS.BytesOutDoc, medS.Result, medS.BasePageSSLTime, medS.DocTime,
+		medS.DomContentLoadedEventEnd, medS.ImageSavings, medS.RequestsDoc,
+		medS.FirstTextPaint, medS.FirstPaint, medS.ScoreCDN, medS.CPUIdle,
+		medS.OptimizationChecked, medS.ImageTotal, medS.ScoreMinify,
+		medS.GzipTotal, medS.Responses404, medS.LoadTime, medS.ScoreCombine,
+		medS.FirstContentfulPaint, medS.FirstLayout, medS.ScoreEtags)
 }
 
 // parsewptCmd represents the parsewpt command
@@ -135,14 +204,4 @@ and populates database with new data.`,
 
 func init() {
 	rootCmd.AddCommand(parsewptCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// parsewptCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// parsewptCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
