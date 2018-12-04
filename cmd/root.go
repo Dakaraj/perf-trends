@@ -69,7 +69,7 @@ func getTestsFromDB(DB *sql.DB) (tests []string) {
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "perf-trends",
+	Use:   "ptrend",
 	Short: "Parses jmeter log and build performance trends statistics",
 	Long: `An application that parses Jmeter log and gathers
 by-transaction statistics saving it to SQLite database for further.

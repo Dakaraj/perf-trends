@@ -14,7 +14,7 @@
 
 package main
 
-import "github.com/dakaraj/perf-trends/cmd"
+import "github.com/dakaraj/ptrend/cmd"
 
 func main() {
 	cmd.Execute()

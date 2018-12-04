@@ -28,7 +28,8 @@ table, th, td {
     overflow-x: hidden;
     border: 1px solid black;
 }
-.request-col {
+tr > td:first-child, tr > th:first-child {
+    width: 400px;
 	max-width: 400px;
 	overflow: hidden;
 	white-space: nowrap;
@@ -79,7 +80,7 @@ function headerPopulate() {
     comparisonList.innerHTML = ""
     headerRow.innerHTML = "<th><span>Test Description</span><hr/><span>Request</span></th>"
     for (let i=0; i<data.tests.length; i++) {
-        headerRow.innerHTML += ` + "`<th class=\"desc-header\" onclick=\"sortByColValue(${i})\">${data.tests[i]}</th>`" + `
+        headerRow.innerHTML += ` + "`<th onclick=\"sortByColValue(${i})\">${data.tests[i]}</th>`" + `
         comparisonList.innerHTML += ` + "`<li><label for=\"chk${i}\"><input type=\"checkbox\" name=\"chk${i}\" id=\"chk${i}\">${data.tests[i]}</label></li>`" + `
     }
 }
@@ -102,7 +103,7 @@ function rowsPopulate(stat) {
     let r = data.results
     let rowsMedians = {}
     for (let key in r) {
-        let row = ` + "`<tr><td class=\"request-col\" title=\"${key}\">${key}</td>`" + `
+        let row = ` + "`<tr><td title=\"${key}\">${key}</td>`" + `
         let validValues = r[key][stat].filter((val) => val != 0)
         validValues.sort((a, b) => a - b)
         let rowMedian = medianCalculator(validValues)
@@ -143,12 +144,12 @@ function compare() {
 	tBody.innerHTML = ""
 	let i = 0
     idxs.forEach(function(idx) {
-		headerRow.innerHTML += ` + "`<th class=\"desc-header\" onclick=\"sortByColValue(${i})\">${data.tests[idx]}</th>`" + `
+		headerRow.innerHTML += ` + "`<th onclick=\"sortByColValue(${i})\">${data.tests[idx]}</th>`" + `
 		i++
     })
     let r = data.results
     for (let key in r) {
-        let row = ` + "`<tr><td class=\"request-col\" title=\"${key}\">${key}</td>`" + `
+        let row = ` + "`<tr><td title=\"${key}\">${key}</td>`" + `
         let vals = r[key][metric]
         let baselineVal = undefined
         idxs.forEach(function(idx) {

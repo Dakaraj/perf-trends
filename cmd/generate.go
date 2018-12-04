@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dakaraj/perf-trends/cmd/templates"
+	"github.com/dakaraj/ptrend/cmd/templates"
 	"math"
 	"os"
 	"strconv"

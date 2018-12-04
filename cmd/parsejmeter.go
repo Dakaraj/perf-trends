@@ -27,7 +27,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dakaraj/perf-trends/dbutils"
+	"github.com/dakaraj/ptrend/dbutils"
 	_ "github.com/mattn/go-sqlite3" // driver for sqlite3 database
 	"github.com/spf13/cobra"
 )
