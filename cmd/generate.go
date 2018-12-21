@@ -19,12 +19,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dakaraj/ptrend/cmd/templates"
 	"math"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/dakaraj/ptrend/templates"
 	_ "github.com/mattn/go-sqlite3" // driver for sqlite3 database
 	"github.com/spf13/cobra"
 	"github.com/valyala/fasttemplate"
@@ -36,10 +36,21 @@ var (
 	testTypeList = []string{"jmeter", "wpt"}
 )
 
+// Stats struct contains per-request statistic
+type Stats struct {
+	Label   string    `json:"label"`
+	Average []float64 `json:"average"`
+	Max     []float64 `json:"max"`
+	Median  []float64 `json:"median"`
+	Min     []float64 `json:"min"`
+	Perc90  []float64 `json:"perc90"`
+	Perc95  []float64 `json:"perc95"`
+}
+
 // Results struct represents statistics per-request per-test
 type Results struct {
-	Tests []string                        `json:"tests"`
-	Stats map[string]map[string][]float64 `json:"results"`
+	Tests []string `json:"tests"`
+	Stats []Stats  `json:"results"`
 }
 
 func convertStatsToFloats(stringStats []string, floatStats []float64) {
@@ -111,9 +122,13 @@ GROUP BY r.label;
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
+	// counting total amount of rows
+	row := DB.QueryRow(`SELECT COUNT(DISTINCT label) FROM request_statistics;`)
+	var totalRows int
+	row.Scan(&totalRows)
 
 	var results Results
-	results.Stats = make(map[string]map[string][]float64)
+	results.Stats = make([]Stats, 0, totalRows)
 	for rows.Next() {
 		var (
 			label          string
@@ -155,24 +170,26 @@ GROUP BY r.label;
 			}
 		}
 
-		// create a map and arrays for each metric
-		requestStats := make(map[string][]float64)
-		requestStats["average"] = make([]float64, testsNumber, testsNumber)
-		requestStats["median"] = make([]float64, testsNumber, testsNumber)
-		requestStats["perc90"] = make([]float64, testsNumber, testsNumber)
-		requestStats["perc95"] = make([]float64, testsNumber, testsNumber)
-		requestStats["min"] = make([]float64, testsNumber, testsNumber)
-		requestStats["max"] = make([]float64, testsNumber, testsNumber)
+		// create struct with calculated metrics
+		requestStats := Stats{
+			Label:   label,
+			Average: make([]float64, testsNumber, testsNumber),
+			Median:  make([]float64, testsNumber, testsNumber),
+			Perc90:  make([]float64, testsNumber, testsNumber),
+			Perc95:  make([]float64, testsNumber, testsNumber),
+			Min:     make([]float64, testsNumber, testsNumber),
+			Max:     make([]float64, testsNumber, testsNumber),
+		}
 
 		// parse each value in array as float and put into an array
-		convertStatsToFloats(splitAverage, requestStats["average"])
-		convertStatsToFloats(splitMedian, requestStats["median"])
-		convertStatsToFloats(splitPerc90, requestStats["perc90"])
-		convertStatsToFloats(splitPerc95, requestStats["perc95"])
-		convertStatsToFloats(splitMin, requestStats["min"])
-		convertStatsToFloats(splitMax, requestStats["max"])
+		convertStatsToFloats(splitAverage, requestStats.Average)
+		convertStatsToFloats(splitMedian, requestStats.Median)
+		convertStatsToFloats(splitPerc90, requestStats.Perc90)
+		convertStatsToFloats(splitPerc95, requestStats.Perc95)
+		convertStatsToFloats(splitMin, requestStats.Min)
+		convertStatsToFloats(splitMax, requestStats.Max)
 
-		results.Stats[label] = requestStats
+		results.Stats = append(results.Stats, requestStats)
 	}
 
 	results.Tests = tests
@@ -185,16 +202,28 @@ GROUP BY r.label;
 	}
 
 	// take a template string, fill in data and write it as a file
-	t := fasttemplate.New(templates.JmeterTemplate, "{{", "}}")
-	page := t.ExecuteString(map[string]interface{}{
+	t := fasttemplate.New(templates.MainJS, "{{", "}}")
+	mainJS := t.ExecuteString(map[string]interface{}{
 		"data": string(byteJSON),
 	})
+
+	// make directory for resuls if needed
+	if err := os.MkdirAll(outputPath, os.ModeDir|0755); err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+
+	// write index.html file
 	file, err := os.Create(outputPath + "/index.html")
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	file.WriteString(page)
+	file.WriteString(templates.JmeterTemplate)
+
+	// write main.js file
+	file, _ = os.Create(outputPath + "/main.js")
+	file.WriteString(mainJS)
 }
 
 // validateGenerateArgs function validates arguments for "generate" command
@@ -213,8 +242,8 @@ func validateGenerateArgs(cmd *cobra.Command, args []string) error {
 	if outputPath == "" {
 		outputPath = "."
 	}
-	if fileInf, err := os.Stat(outputPath); err != nil || !fileInf.IsDir() {
-		return errors.New("Output path is invalid. Should be an existing directory")
+	if fileInf, err := os.Stat(outputPath); err == nil && !fileInf.IsDir() {
+		return errors.New("Output path is invalid. Should not exist or be a directory")
 	}
 
 	// validate source flag is valid

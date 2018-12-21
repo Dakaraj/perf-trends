@@ -14,12 +14,12 @@ func TestParsingJmeterLog(t *testing.T) {
 	header = true
 	delimiter = "~"
 	ignorePatternString = `^(TC |OPTIONS |chunk\.)`
-	// testing validateParseArgs function
-	if err := validateParseArgs(parseCmd, args); err != nil {
+	// testing validateParsejmeterArgs function
+	if err := validateParseJmeterArgs(parsejmeterCmd, args); err != nil {
 		t.Logf("Provided arguments are invalid\nError: %v", err)
 		t.Fail()
 	}
-	// testing parseFiles function
-	parseFiles(parseCmd, args)
+	// testing parsejmeterFiles function
+	parseJmeterFiles(parsejmeterCmd, args)
 	os.Remove(args[1])
 }
